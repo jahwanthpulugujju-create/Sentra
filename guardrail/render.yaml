@@ -1,0 +1,27 @@
+# Render Blueprint for the GuardRail demo (backend + static frontend).
+# Deploy: push this repo to GitHub, then in Render → "New +" → "Blueprint" →
+# pick this repo. Render reads this file and creates both services.
+#
+# After the backend deploys, note its URL (e.g. https://guardrail-backend.onrender.com)
+# and open the frontend as:  https://<frontend-url>/?api=https://<backend-url>
+# (the frontend reads the ?api= override). Optionally set ANTHROPIC_API_KEY on
+# the backend service for the real intent check.
+services:
+  - type: web
+    name: guardrail-backend
+    runtime: python
+    rootDir: guardrail
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false        # set this in the Render dashboard if you want live Claude
+
+  - type: web
+    name: guardrail-frontend
+    runtime: static
+    rootDir: guardrail
+    plan: free
+    buildCommand: ""
+    staticPublishPath: .

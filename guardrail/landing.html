@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Judgment Layer for Autonomous Agent Payments</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000000; --panel:#0b0c0e; --panel2:#101216; --inset:#070809;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --ink:#f3f5f9; --muted:#8b909b; --faint:#565b64;
+    --blue:#2e9bff; --blue2:#0a84ff; --blue-lite:#7cc4ff;
+    --glow:rgba(46,155,255,.32);
+    --serif:"Fraunces",Georgia,"Times New Roman",serif;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+  a{color:inherit;text-decoration:none}
+  .serif{font-family:var(--serif)}
+  .eyebrow{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);
+    display:inline-flex;align-items:center;gap:9px}
+  .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--blue);
+    box-shadow:0 0 10px var(--glow)}
+  .muted{color:var(--muted)} .faint{color:var(--faint)}
+  .lead{font-size:16px;line-height:1.65;color:var(--muted);max-width:44ch}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:999px;
+    font-size:14px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:.18s;white-space:nowrap}
+  .btn.blue{background:linear-gradient(180deg,#3aa5ff,var(--blue2));color:#001b34;
+    box-shadow:0 6px 24px rgba(10,132,255,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+  .btn.blue:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  .btn.ghost{background:rgba(255,255,255,.03);border-color:var(--line2);color:var(--ink)}
+  .btn.ghost:hover{background:rgba(255,255,255,.07)}
+  .btn.dark{background:#0a0a0c;border-color:var(--line2);color:var(--ink)}
+
+  /* nav */
+  nav{position:sticky;top:14px;z-index:50;display:flex;justify-content:center;padding:0 24px}
+  .navpill{display:flex;align-items:center;gap:22px;padding:9px 9px 9px 18px;border-radius:999px;
+    background:rgba(12,13,16,.72);backdrop-filter:blur(14px);border:1px solid var(--line);
+    box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  .navpill .logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:-.01em}
+  .navpill .logo .mk{color:var(--blue)}
+  .navlinks{display:flex;gap:20px;font-size:13.5px;color:var(--muted)}
+  .navlinks a:hover{color:var(--ink)}
+  @media(max-width:720px){.navlinks{display:none}}
+
+  /* hero */
+  .hero{position:relative;padding:74px 0 40px}
+  .heroframe{position:relative;border-radius:26px;padding:64px 48px 56px;overflow:hidden;
+    background:radial-gradient(120% 90% at 50% -10%,rgba(46,155,255,.16),transparent 55%),#020304;
+    border:1px solid rgba(46,155,255,.28);
+    box-shadow:0 0 0 1px rgba(46,155,255,.10),0 -2px 60px rgba(46,155,255,.28) inset,0 30px 80px rgba(0,0,0,.6)}
+  .heroframe::before{content:"";position:absolute;inset:0;border-radius:26px;pointer-events:none;
+    box-shadow:0 0 90px rgba(46,155,255,.25) inset}
+  .hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(38px,6vw,72px);line-height:1.02;
+    letter-spacing:-.02em;margin:20px 0 22px;max-width:16ch}
+  .hero h1 .accent{font-style:italic;color:var(--blue-lite)}
+  .herocta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+  .orbit{position:absolute;right:44px;top:70px;width:290px;height:290px;pointer-events:none;opacity:.9}
+  @media(max-width:900px){.orbit{display:none}}
+  .orbit .ring{position:absolute;inset:0;border:1px solid rgba(255,255,255,.06);border-radius:50%}
+  .orbit .ring.r2{inset:38px} .orbit .ring.r3{inset:80px}
+  .orbit .node{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border-radius:50%;
+    background:var(--blue);box-shadow:0 0 24px 6px var(--glow)}
+  .orbit .tag{position:absolute;font-size:9px;letter-spacing:.18em;color:var(--faint);text-transform:uppercase}
+  .orbit .t1{right:6px;top:44%} .orbit .t2{left:2px;bottom:20%}
+  .core3d{position:absolute;right:20px;top:34px;width:350px;height:350px;cursor:grab;touch-action:none;z-index:1}
+  .corehint{position:absolute;right:36px;bottom:20px;font-size:9px;letter-spacing:.2em;
+    color:var(--faint);text-transform:uppercase;z-index:2;pointer-events:none}
+  @media(max-width:900px){.core3d,.corehint{display:none}}
+
+  section{padding:76px 0}
+  .center{text-align:center;max-width:720px;margin:0 auto}
+  .h2{font-family:var(--serif);font-weight:400;font-size:clamp(30px,4.4vw,52px);line-height:1.06;
+    letter-spacing:-.02em;margin:16px 0 16px}
+  .h2 .g{color:#5f636c;font-style:italic}
+
+  /* logo strip */
+  .logos{display:flex;align-items:center;justify-content:center;gap:38px;flex-wrap:wrap;
+    padding:26px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    color:#4a4e56;font-size:15px;letter-spacing:.02em}
+  .logos b{font-weight:600;color:#6a6f79;font-family:var(--serif)}
+
+  /* feature cards */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:44px}
+  @media(max-width:840px){.cards{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px;transition:.2s}
+  .card:hover{border-color:var(--line2);transform:translateY(-3px)}
+  .card .ct{font-weight:600;font-size:17px;margin:4px 0 8px;display:flex;align-items:center;gap:8px}
+  .card .ct .sp{color:var(--blue)}
+  .card p{color:var(--muted);font-size:13.5px;line-height:1.55;margin:0}
+  .mock{margin-top:18px;background:var(--inset);border:1px solid var(--line);border-radius:12px;
+    padding:14px;min-height:150px;position:relative;overflow:hidden}
+  .mrow{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted);
+    padding:7px 9px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
+  .mrow .b{background:var(--blue);color:#00243f;padding:2px 8px;border-radius:6px;font-weight:600}
+  .bar{height:5px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;width:64%;background:linear-gradient(90deg,var(--blue2),var(--blue-lite))}
+  .mono{font-family:ui-monospace,"SF Mono",Consolas,monospace}
+  .miniorbit{position:absolute;inset:0;display:grid;place-items:center}
+  .miniorbit .ring{position:absolute;width:120px;height:120px;border:1px solid rgba(255,255,255,.07);border-radius:50%}
+  .miniorbit .ring.b{width:76px;height:76px}
+  .miniorbit .core{width:34px;height:34px;border-radius:9px;background:linear-gradient(180deg,var(--blue),#1f6fd0);
+    display:grid;place-items:center;box-shadow:0 0 26px var(--glow)}
+  .toggle{width:34px;height:18px;border-radius:99px;background:var(--blue);position:relative;flex:none}
+  .toggle::after{content:"";position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+
+  /* statement + testimonial */
+  .statement{font-family:var(--serif);font-weight:400;font-size:clamp(26px,3.8vw,44px);line-height:1.12;
+    letter-spacing:-.02em;max-width:20ch}
+  .statement .g{color:#5f636c;font-style:italic}
+  .testi{display:grid;grid-template-columns:190px 1fr;gap:26px;align-items:center;margin-top:44px;
+    background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
+  @media(max-width:700px){.testi{grid-template-columns:1fr}}
+  .portrait{height:180px;border-radius:12px;filter:grayscale(1) contrast(1.05);
+    background:linear-gradient(160deg,#2a2d33,#0d0e11);position:relative;overflow:hidden}
+  .portrait::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(60% 55% at 50% 35%,rgba(255,255,255,.14),transparent 60%)}
+  .quote{font-size:18px;line-height:1.5;color:var(--ink);font-weight:400}
+  .metabar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;flex-wrap:wrap}
+  .stat{font-size:11px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;
+    border:1px solid var(--line);border-radius:99px;padding:8px 14px}
+
+  /* infra split */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+  @media(max-width:840px){.split{grid-template-columns:1fr}}
+  .infracard{margin-top:34px;background:var(--panel);border:1px solid var(--line);border-radius:18px;
+    padding:26px;display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:center}
+  @media(max-width:700px){.infracard{grid-template-columns:1fr}}
+  .exch{background:var(--inset);border:1px solid var(--line);border-radius:12px;padding:16px;min-height:150px}
+
+  /* blue CTA */
+  .bluecta{position:relative;border-radius:24px;padding:48px;overflow:hidden;
+    background:radial-gradient(130% 120% at 20% 20%,#5fc0ff,#1287f0 55%,#0a6ad0);color:#00243f}
+  .bluecta::after{content:"";position:absolute;right:-10%;top:-30%;width:70%;height:160%;
+    background:conic-gradient(from 180deg,rgba(255,255,255,.35),transparent 40%,rgba(255,255,255,.2));
+    filter:blur(30px);opacity:.5}
+  .bluecta .inner{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:end}
+  @media(max-width:760px){.bluecta .inner{grid-template-columns:1fr}}
+  .bluecta h3{font-family:var(--serif);font-weight:400;font-style:italic;font-size:clamp(28px,3.6vw,42px);
+    line-height:1.08;margin:0}
+  .bluecta .r{color:#023a63;font-size:15px;line-height:1.55}
+
+  /* footer */
+  footer{border-top:1px solid var(--line);padding:56px 0 40px;position:relative;overflow:hidden}
+  .fgrid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr 1.2fr;gap:28px}
+  @media(max-width:840px){.fgrid{grid-template-columns:1fr 1fr}}
+  .fcol h5{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:0 0 14px}
+  .fcol a{display:block;color:var(--muted);font-size:13.5px;margin-bottom:9px}
+  .fcol a:hover{color:var(--ink)}
+  .fcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .watermark{font-family:var(--serif);font-size:clamp(80px,20vw,240px);line-height:.8;color:rgba(255,255,255,.02);
+    font-style:italic;margin-top:30px;letter-spacing:-.03em;pointer-events:none;user-select:none}
+  .copy{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;color:var(--faint);font-size:12px;
+    padding-top:22px;margin-top:6px;border-top:1px solid var(--line)}
+
+  .reveal{opacity:0;transform:translateY(16px);transition:opacity .7s cubic-bezier(.19,1,.22,1),transform .7s cubic-bezier(.19,1,.22,1)}
+  .reveal.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="navpill">
+    <div class="logo"><span class="mk">&#9672;</span> Judgment Layer</div>
+    <div class="navlinks">
+      <a href="#capabilities">Philosophy</a>
+      <a href="#capabilities">Capabilities</a>
+      <a href="#roles">Roles</a>
+    </div>
+    <a class="btn dark" href="/">Launch Console &#9656;</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <!-- HERO -->
+  <header class="hero">
+    <div class="heroframe reveal">
+      <canvas class="core3d" id="coreHero" aria-label="Interactive 3D judgment core"></canvas>
+      <div class="corehint">&#9672; Move your cursor &middot; live core</div>
+      <span class="eyebrow">System Operational</span>
+      <h1><span class="accent">Judge every agent payment</span> with absolute precision.</h1>
+      <p class="lead">A decision layer that sits between an autonomous agent and its money —
+        screening every transaction for intent, anomaly, and policy before a rupee moves.</p>
+      <div class="herocta">
+        <a class="btn blue" href="/">Initialize Protocol</a>
+        <a class="btn ghost" href="#capabilities">View Ecosystem</a>
+      </div>
+    </div>
+  </header>
+</div>
+
+<!-- LOGO STRIP -->
+<div class="wrap">
+  <div class="logos reveal">
+    <b>Airbrake</b><span>Amplitude</span><span>ANTHROP\C</span>
+    <span class="faint" style="font-size:11px;letter-spacing:.2em">TRUSTED BY INDUSTRY LEADERS</span>
+  </div>
+</div>
+
+<!-- CAPABILITIES -->
+<section id="capabilities" class="wrap">
+  <div class="center reveal">
+    <span class="eyebrow">System Capabilities</span>
+    <div class="h2">Payment intelligence <span class="g">made effortless.</span></div>
+    <p class="lead" style="margin:0 auto">Three checks run before any agent spend — deterministic rules,
+      semantic intent, and behavioural anomaly — resolving to Allow, Escalate, or Deny.</p>
+  </div>
+
+  <div class="cards">
+    <div class="card reveal">
+      <div class="ct">Rule Engine</div>
+      <p>Budget caps, blocked vendors, and velocity limits in milliseconds — the deterministic safety net.</p>
+      <div class="mock">
+        <div class="mrow"><span>Budget · Developer Agent</span><span class="b">₹5,870</span></div>
+        <div class="mrow"><span class="mono">Velocity 2 / 10s</span><span>OK</span></div>
+        <div class="mono faint" style="font-size:11px;margin-top:8px">rule.pass → intent</div>
+        <div class="bar"><i></i></div>
+      </div>
+    </div>
+
+    <div class="card reveal">
+      <div class="ct"><span class="sp">&#10022;</span> Intent Match</div>
+      <p>Does this purchase serve the agent's declared task? One model call catches the semantic hijacks rules miss.</p>
+      <div class="mock">
+        <div class="miniorbit">
+          <div class="ring"></div><div class="ring b"></div>
+          <div class="core">&#9672;</div>
+        </div>
+        <div class="mono faint" style="position:absolute;bottom:12px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.15em">SEMANTIC MATCH · 0.94</div>
+      </div>
+    </div>
+
+    <div class="card reveal">
+      <div class="ct">Multi-Sig Governance</div>
+      <p>Escalate the ambiguous. Set permissions, approve transactions from a phone, and keep an audit log.</p>
+      <div class="mock">
+        <div class="mrow"><span class="mono">TREASURY_V4</span><span>&#128274;</span></div>
+        <div class="mrow"><span>Signed by Alex</span><span class="toggle"></span></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <span class="btn dark" style="padding:7px 12px;font-size:11px">Audit Log</span>
+          <span class="btn blue" style="padding:7px 12px;font-size:11px">Approve Tx</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="center" style="margin-top:34px">
+    <a class="btn ghost reveal" href="/">Explore Capabilities &#8594;</a>
+  </div>
+</section>
+
+<!-- STATEMENT + TESTIMONIAL -->
+<section id="roles" class="wrap">
+  <span class="eyebrow reveal">Built for the agentic economy</span>
+  <div class="statement reveal" style="margin-top:16px">Authorized isn't the same as safe —
+    <span class="g">an agent can be under budget and still catastrophically wrong. This layer decides if.</span></div>
+
+  <div class="testi reveal">
+    <div class="portrait"></div>
+    <div>
+      <div class="quote">&ldquo;An injected agent tried to drain the treasury on a GPU cluster — under budget,
+        fully authorized. The judgment layer paused it and pinged my phone before a rupee moved.&rdquo;</div>
+      <div class="metabar">
+        <span class="stat">Prevented Loss · ₹5,000 · 1 tap</span>
+        <a class="btn blue" href="/">Start Investing</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INFRA -->
+<section class="wrap">
+  <div class="split">
+    <div class="reveal">
+      <span class="eyebrow">Payment Infrastructure</span>
+      <div class="h2" style="margin-top:14px">Screen &amp; Approve <span class="g">Global Agent Spend Instantly.</span></div>
+    </div>
+    <p class="lead reveal" style="align-self:center">Sits in front of any rail — Visa, Stripe, x402, a mock ledger.
+      Allow, Escalate, or Deny with zero-slippage decisions and a full audit trail.</p>
+  </div>
+
+  <div class="infracard reveal">
+    <div>
+      <div class="serif" style="font-size:24px;font-style:italic;margin-bottom:8px">Allow, Escalate &amp; Deny in real time.</div>
+      <p class="lead" style="font-size:14px">Route every agent transaction through one policy engine. One interface for
+        rules, intent, and anomaly — across every agent in your fleet.</p>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <a class="btn blue" href="/">Get Started</a>
+        <a class="btn ghost" href="/">View Markets</a>
+      </div>
+    </div>
+    <div class="exch">
+      <div class="mrow"><span class="mono">GPU cluster rental</span><span class="b" style="background:#f97316;color:#2a1400">ESCALATE</span></div>
+      <div class="mrow"><span class="mono">Amount</span><span class="mono">₹5,000</span></div>
+      <div class="mrow"><span class="mono">Image API</span><span class="b" style="background:var(--blue);color:#00243f">ALLOW</span></div>
+      <div class="mono faint" style="font-size:11px;margin-top:10px">3 checks · 187 ms · claude intent</div>
+    </div>
+  </div>
+</section>
+
+<!-- BLUE CTA -->
+<section class="wrap">
+  <div class="bluecta reveal">
+    <div class="inner">
+      <div>
+        <h3>Uncertain an agent<br>should spend?</h3>
+        <a class="btn dark" href="/" style="margin-top:20px">Consult Architect &nbsp;·&nbsp; Priority Access</a>
+      </div>
+      <div class="r">Our policy specialists are standing by to model your agent's risk profile and
+        architect a custom approval flow — from a static budget to intent-aware governance.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap">
+    <div class="fgrid">
+      <div class="fcol">
+        <div class="logo serif" style="font-size:20px;font-style:italic;margin-bottom:12px">&#9672; Judgment Layer</div>
+        <p class="faint" style="font-size:13px;line-height:1.6;max-width:26ch">Engineering the bedrock of the
+          agentic economy. The judgment layer every payment rail is missing.</p>
+      </div>
+      <div class="fcol"><h5>Protocol</h5>
+        <a href="/">Console</a><a href="#capabilities">Capabilities</a><a href="#capabilities">Governance</a><a href="/health">System Status</a></div>
+      <div class="fcol"><h5>Company</h5>
+        <a href="#">Philosophy</a><a href="#">Careers</a><a href="#">Press Kit</a><a href="#">Legal</a></div>
+      <div class="fcol"><div class="fcard"><div style="font-size:13px;font-weight:600">Contact Sales</div>
+        <div class="faint" style="font-size:12px;margin-top:6px">Talk to a policy architect &#8599;</div></div></div>
+      <div class="fcol"><div class="fcard"><div style="font-size:13px;font-weight:600">Help Center</div>
+        <div class="faint" style="font-size:12px;margin-top:6px">Docs, guides &amp; support &#127911;</div></div></div>
+    </div>
+    <div class="watermark">judgment</div>
+    <div class="copy"><span>© 2026 · The Judgment Layer for Autonomous Agent Payments.</span>
+      <span class="mono">SYSTEM · OPERATIONAL</span></div>
+  </div>
+</footer>
+
+<script>
+  const io = new IntersectionObserver((es)=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }), {threshold:.12});
+  document.querySelectorAll(".reveal").forEach(el=>io.observe(el));
+</script>
+
+<!-- ===== Judgment Core: self-contained interactive 3D node-sphere (no libraries) ===== -->
+<script>
+function initJudgmentCore(canvas, opts){
+  opts = opts || {};
+  const ctx = canvas.getContext('2d');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const BLUE = [46,155,255];
+  const N = opts.nodes || 110;
+
+  const pts = [], GA = Math.PI*(3-Math.sqrt(5));
+  for(let i=0;i<N;i++){
+    const y = 1-(i/(N-1))*2, r = Math.sqrt(Math.max(0,1-y*y)), t = GA*i;
+    pts.push({x:Math.cos(t)*r, y:y, z:Math.sin(t)*r, tw:Math.random()*6.28});
+  }
+  const rings = [
+    {a:1.30, tiltX:0.55, tiltZ:0.20, spd:0.50, phase:0.0},
+    {a:1.02, tiltX:-0.90, tiltZ:0.60, spd:-0.80, phase:2.1},
+    {a:1.55, tiltX:1.15, tiltZ:-0.30, spd:0.32, phase:4.0},
+  ];
+
+  let W=0,H=0,CX=0,CY=0,R=0,dpr=1;
+  const baseYaw=0.4, basePitch=-0.2;
+  let yaw=baseYaw, pitch=basePitch, tYaw=baseYaw, tPitch=basePitch;
+  let pulse=0, pulseRGB=BLUE, t0=0, raf=0;
+
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    W=Math.max(1,rect.width); H=Math.max(1,rect.height);
+    dpr=Math.min(2, window.devicePixelRatio||1);
+    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    CX=W/2; CY=H/2; R=Math.min(W,H)*0.34;
+  }
+  function rotP(x,y,z){
+    const cy=Math.cos(yaw), sy=Math.sin(yaw);
+    let X=x*cy - z*sy, Z=x*sy + z*cy;
+    const cx=Math.cos(pitch), sx=Math.sin(pitch);
+    let Y=y*cx - Z*sx; Z=y*sx + Z*cx;
+    return [X,Y,Z];
+  }
+  const PSP=2.6;
+  function proj(X,Y,Z){ const s=PSP/(PSP-Z); return [CX+X*R*s, CY+Y*R*s, s]; }
+  function col(rgb,a){ return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')'; }
+  function mix(a,b,t){ return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)]; }
+  function tiltPoint(a,rg){
+    let x=Math.cos(a)*rg.a, y=0, z=Math.sin(a)*rg.a;
+    let y2=y*Math.cos(rg.tiltX)-z*Math.sin(rg.tiltX), z2=y*Math.sin(rg.tiltX)+z*Math.cos(rg.tiltX); y=y2; z=z2;
+    let x2=x*Math.cos(rg.tiltZ)-y*Math.sin(rg.tiltZ), y3=x*Math.sin(rg.tiltZ)+y*Math.cos(rg.tiltZ); x=x2; y=y3;
+    return rotP(x,y,z);
+  }
+
+  function draw(ts){
+    if(!t0) t0=ts; const time=(ts-t0)/1000;
+    yaw += (tYaw-yaw)*0.07; pitch += (tPitch-pitch)*0.07;
+    pitch=Math.max(-1.1,Math.min(1.1,pitch));
+    if(pulse>0) pulse=Math.max(0,pulse-0.014);
+    const cur = pulse>0 ? mix(BLUE,pulseRGB,pulse) : BLUE;
+
+    ctx.clearRect(0,0,W,H);
+    ctx.globalCompositeOperation='lighter';
+
+    const coreR = R*(0.30+0.05*Math.sin(time*2)) + pulse*R*0.14;
+    let g=ctx.createRadialGradient(CX,CY,0,CX,CY,coreR*2.3);
+    g.addColorStop(0, col(cur,0.5+0.28*pulse)); g.addColorStop(0.4, col(cur,0.13)); g.addColorStop(1, col(cur,0));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY,coreR*2.3,0,6.2832); ctx.fill();
+    g=ctx.createRadialGradient(CX-coreR*0.3,CY-coreR*0.3,0,CX,CY,coreR);
+    g.addColorStop(0,col(mix(cur,[255,255,255],0.55),0.9)); g.addColorStop(1,col(cur,0.12));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY,coreR,0,6.2832); ctx.fill();
+
+    for(const rg of rings){
+      ctx.beginPath(); const seg=72;
+      for(let k=0;k<=seg;k++){ const [X,Y,Z]=tiltPoint(k/seg*6.2832,rg); const s=PSP/(PSP-Z); const sx=CX+X*R*s, sy=CY+Y*R*s; k?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy); }
+      ctx.strokeStyle=col(cur,0.15); ctx.lineWidth=1; ctx.stroke();
+      const [X,Y,Z]=tiltPoint(time*rg.spd+rg.phase,rg); const [sx,sy,s]=proj(X,Y,Z);
+      ctx.fillStyle=col(mix(cur,[255,255,255],0.45),0.9); ctx.beginPath(); ctx.arc(sx,sy,2.4*s,0,6.2832); ctx.fill();
+    }
+
+    const pr=[];
+    for(const p of pts){ const [X,Y,Z]=rotP(p.x,p.y,p.z); const [sx,sy,s]=proj(X,Y,Z); pr.push({sx,sy,z:Z,s,tw:p.tw}); }
+    pr.sort((a,b)=>a.z-b.z);
+    const TH=R*0.42, TH2=TH*TH;
+    ctx.lineWidth=1;
+    for(let i=0;i<pr.length;i++){ const A=pr[i];
+      for(let j=i+1;j<pr.length;j++){ const B=pr[j]; const dx=A.sx-B.sx, dy=A.sy-B.sy, d2=dx*dx+dy*dy;
+        if(d2<TH2){ const dep=(A.z+B.z)/2, a=(1-Math.sqrt(d2)/TH)*0.2*(0.4+0.6*(dep+1)/2);
+          if(a>0.02){ ctx.strokeStyle=col(cur,a); ctx.beginPath(); ctx.moveTo(A.sx,A.sy); ctx.lineTo(B.sx,B.sy); ctx.stroke(); } } } }
+    for(const q of pr){ const dep=(q.z+1)/2; let a=(0.2+0.7*dep)*(0.75+0.25*Math.sin(time*2+q.tw));
+      ctx.fillStyle=col(mix(cur,[255,255,255],0.15*dep),a); ctx.beginPath(); ctx.arc(q.sx,q.sy,(0.9+1.5*q.s)*(0.7+0.5*dep),0,6.2832); ctx.fill(); }
+
+    ctx.globalCompositeOperation='source-over';
+    raf=requestAnimationFrame(draw);
+  }
+
+  function P(e){ const t=e.touches&&e.touches[0]; return {x:(t?t.clientX:e.clientX), y:(t?t.clientY:e.clientY)}; }
+  function track(e){ const p=P(e); const rect=canvas.getBoundingClientRect();
+    const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+    let nx=(p.x-cx)/(window.innerWidth/2), ny=(p.y-cy)/(window.innerHeight/2);
+    nx=Math.max(-1.4,Math.min(1.4,nx)); ny=Math.max(-1.4,Math.min(1.4,ny));
+    tYaw=baseYaw+nx*0.9; tPitch=basePitch+ny*0.55; }
+  window.addEventListener('pointermove',track);
+  window.addEventListener('pointerdown',track);
+  const ro=('ResizeObserver' in window)?new ResizeObserver(resize):null;
+  if(ro) ro.observe(canvas); else window.addEventListener('resize',resize);
+  resize(); raf=requestAnimationFrame(draw);
+  canvas.style.cursor='default'; canvas.style.touchAction='none';
+
+  function hexToRgb(h){ if(!h)return null; h=(''+h).replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  return { pulse:function(hex){ pulseRGB=hexToRgb(hex)||BLUE; pulse=1; }, destroy:function(){ cancelAnimationFrame(raf); if(ro)ro.disconnect(); } };
+}
+  const _hero=document.getElementById('coreHero');
+  if(_hero) initJudgmentCore(_hero,{nodes:110});
+</script>
+</body>
+</html>

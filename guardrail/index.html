@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Judgment Layer for Autonomous Agent Payments</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000000; --panel:#0b0c0e; --panel2:#101216; --inset:#070809;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --ink:#f3f5f9; --muted:#8b909b; --faint:#565b64;
+    --blue:#2e9bff; --blue2:#0a84ff; --blue-lite:#7cc4ff; --glow:rgba(46,155,255,.32);
+    --accent:#2e9bff;
+    --green:#3ddc91; --red:#ff5a6a; --orange:#f9a03f;
+    --serif:"Fraunces",Georgia,"Times New Roman",serif;
+    --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  .mono{font-family:ui-monospace,"SF Mono",Consolas,monospace}
+  .small{font-size:12px;color:var(--muted)}
+  .eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);
+    display:inline-flex;align-items:center;gap:9px;margin:0 0 14px}
+  .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--blue);
+    box-shadow:0 0 10px var(--glow)}
+
+  /* nav */
+  nav{position:sticky;top:14px;z-index:50;display:flex;justify-content:center;padding:14px 20px 0}
+  .navpill{display:flex;align-items:center;gap:16px;padding:9px 9px 9px 18px;border-radius:999px;width:100%;max-width:1180px;
+    background:rgba(12,13,16,.72);backdrop-filter:blur(14px);border:1px solid var(--line);
+    box-shadow:0 10px 40px rgba(0,0,0,.6)}
+  .navpill .logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;letter-spacing:-.01em}
+  .navpill .logo .mk{color:var(--blue)}
+  .navpill .logo small{display:block;font-weight:400;font-size:11px;color:var(--muted);letter-spacing:0}
+  .navspace{flex:1}
+  .badge{font-size:12px;padding:7px 12px;border-radius:999px;border:1px solid var(--line);
+    display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.02);color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);box-shadow:0 0 8px transparent}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;
+    font-family:var(--sans);font-size:14px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:.18s;white-space:nowrap}
+  .btn.blue{background:linear-gradient(180deg,#3aa5ff,var(--blue2));color:#001b34;
+    box-shadow:0 6px 24px rgba(10,132,255,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+  .btn.blue:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  .btn.ghost{background:rgba(255,255,255,.03);border-color:var(--line2);color:var(--ink)}
+  .btn.ghost:hover{background:rgba(255,255,255,.07)}
+  .btn.dark{background:#0a0a0c;border-color:var(--line2);color:var(--ink)}
+  .btn.dark:hover{background:#141519}
+  .btn:disabled{opacity:.45;cursor:default;transform:none}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 20px 60px}
+
+  /* intro */
+  .intro{display:grid;grid-template-columns:1fr 330px;gap:26px;align-items:center;padding:24px 4px 20px}
+  .intro h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,4.6vw,50px);line-height:1.03;
+    letter-spacing:-.02em;margin:0 0 14px;max-width:20ch}
+  .intro h1 .accent{font-style:italic;color:var(--blue-lite)}
+  .intro .lead{font-size:15px;line-height:1.6;color:var(--muted);max-width:60ch;margin:0}
+  .core-wrap{position:relative}
+  .core3d{width:100%;height:300px;cursor:grab;touch-action:none;display:block}
+  .corehint{position:absolute;left:0;right:0;bottom:-4px;text-align:center;font-size:9px;
+    letter-spacing:.2em;color:var(--faint);text-transform:uppercase;pointer-events:none}
+  @media(max-width:860px){.intro{grid-template-columns:1fr}.core-wrap{display:none}}
+
+  /* mode tabs */
+  .tabs{display:flex;gap:10px;margin:8px 0 20px;flex-wrap:wrap}
+  .tab{flex:1;min-width:200px;padding:14px 16px;border-radius:16px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:pointer;font-family:var(--sans);
+    font-weight:600;font-size:14px;text-align:left;transition:.18s}
+  .tab:hover{border-color:var(--line2)}
+  .tab .sub{display:block;font-weight:400;font-size:11.5px;color:var(--muted);margin-top:3px;letter-spacing:.01em}
+  .tab.active{border-color:var(--blue);box-shadow:0 0 0 1px rgba(46,155,255,.25),0 -1px 30px rgba(46,155,255,.18) inset}
+  .tab[data-mode="approve"].active{border-color:var(--green);box-shadow:0 0 0 1px rgba(61,220,145,.22),0 -1px 30px rgba(61,220,145,.15) inset}
+  .tab[data-mode="escalate"].active{border-color:var(--orange);box-shadow:0 0 0 1px rgba(249,160,63,.22),0 -1px 30px rgba(249,160,63,.15) inset}
+  .tab[data-mode="deny"].active{border-color:var(--red);box-shadow:0 0 0 1px rgba(255,90,106,.22),0 -1px 30px rgba(255,90,106,.15) inset}
+
+  /* layout */
+  .grid{display:grid;grid-template-columns:1.12fr .88fr;gap:16px}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}}
+  .stack{display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px}
+  .card h3{margin:0 0 14px;font-size:11px;text-transform:uppercase;letter-spacing:.22em;color:var(--muted);
+    display:inline-flex;align-items:center;gap:9px}
+  .card h3::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--blue);box-shadow:0 0 10px var(--glow)}
+  .card.glow{border-color:rgba(46,155,255,.28);
+    box-shadow:0 0 0 1px rgba(46,155,255,.08),0 -2px 50px rgba(46,155,255,.10) inset}
+
+  /* agent chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .chip{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;
+    border:1px solid var(--line);background:var(--panel2);cursor:pointer;font-size:13px;transition:.15s}
+  .chip:hover{border-color:var(--line2)}
+  .chip .av{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+    font-size:11px;font-weight:700;color:#001b34}
+  .chip.active{border-color:var(--blue);box-shadow:0 0 0 1px rgba(46,155,255,.3)}
+
+  /* chat */
+  .chat{min-height:210px;max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:4px 2px}
+  .msg{display:flex;gap:9px;max-width:90%}
+  .msg .av{width:27px;height:27px;border-radius:8px;flex:none;display:grid;place-items:center;
+    font-size:12px;font-weight:700;color:#001b34}
+  .msg .body{background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    padding:9px 12px;font-size:14px;line-height:1.45}
+  .msg.me{align-self:flex-end;flex-direction:row-reverse}
+  .msg.me .body{background:linear-gradient(180deg,rgba(46,155,255,.16),rgba(46,155,255,.06));border-color:rgba(46,155,255,.3)}
+  .msg .meta{font-size:11px;color:var(--faint);margin-top:5px}
+
+  .inputrow{display:flex;gap:9px;margin-top:14px}
+  .inputrow input{flex:1;background:var(--inset);border:1px solid var(--line);border-radius:999px;
+    color:var(--ink);padding:12px 16px;font-size:14px;font-family:var(--sans);outline:none;transition:.15s}
+  .inputrow input:focus{border-color:var(--blue);box-shadow:0 0 0 1px rgba(46,155,255,.25)}
+  .quick{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+  .quick span{font-size:12px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--line);
+    padding:6px 12px;border-radius:999px;cursor:pointer;transition:.15s}
+  .quick span:hover{color:var(--ink);border-color:var(--line2)}
+
+  /* policy engine */
+  .progress{height:5px;background:rgba(255,255,255,.06);border-radius:999px;overflow:hidden;margin-bottom:14px}
+  .progress .fill{height:100%;width:0;background:linear-gradient(90deg,var(--blue2),var(--blue-lite));transition:width .35s}
+  .checkcard{border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:10px;
+    display:flex;gap:12px;background:var(--inset);transition:.2s;position:relative;overflow:hidden}
+  .checkcard .bar{position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent}
+  .checkcard .num{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;
+    font-size:12px;font-weight:700;border:1px solid var(--line2);color:var(--muted);transition:.2s}
+  .checkcard .t{font-weight:600;font-size:14px}
+  .checkcard .d{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4}
+  .checkcard.running{border-color:var(--blue);box-shadow:0 0 0 1px rgba(46,155,255,.2)}
+  .checkcard.running .num{border-color:var(--blue);color:var(--blue);box-shadow:0 0 14px var(--glow)}
+  .checkcard.pass{border-color:rgba(61,220,145,.5)} .checkcard.pass .bar{background:var(--green)}
+  .checkcard.pass .num{border-color:var(--green);color:var(--green)}
+  .checkcard.fail{border-color:rgba(255,90,106,.5)} .checkcard.fail .bar{background:var(--red)}
+  .checkcard.fail .num{border-color:var(--red);color:var(--red)}
+  .checkcard.skip{opacity:.4}
+  .tag{font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);
+    margin-left:7px;letter-spacing:.06em;vertical-align:middle}
+
+  .decision{margin-top:14px;text-align:center;padding:18px;border-radius:16px;border:1px solid var(--line);
+    background:var(--inset);display:none}
+  .decision.show{display:block;animation:pop .28s cubic-bezier(.19,1,.22,1)}
+  @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+  .decision .big{font-family:var(--serif);font-weight:400;font-size:28px;letter-spacing:-.01em}
+  .decision .r{font-size:13.5px;color:var(--muted);margin-top:7px;line-height:1.5}
+  .decision .lat{font-size:11px;color:var(--faint);margin-top:8px;letter-spacing:.08em;text-transform:uppercase}
+  .d-ALLOWED{border-color:rgba(61,220,145,.4);box-shadow:0 -2px 40px rgba(61,220,145,.12) inset} .d-ALLOWED .big{color:var(--green)}
+  .d-ESCALATED{border-color:rgba(249,160,63,.4);box-shadow:0 -2px 40px rgba(249,160,63,.12) inset} .d-ESCALATED .big{color:var(--orange)}
+  .d-DENIED{border-color:rgba(255,90,106,.4);box-shadow:0 -2px 40px rgba(255,90,106,.12) inset} .d-DENIED .big{color:var(--red)}
+  .resolve-row{display:flex;gap:10px;justify-content:center;margin-top:14px}
+  .waiting{color:var(--orange);font-size:12px;margin-top:10px;text-align:center;display:none;letter-spacing:.02em}
+
+  /* audit log */
+  .log{max-height:230px;overflow-y:auto}
+  .logitem{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .logitem:last-child{border-bottom:none}
+  .pill{font-size:9.5px;font-weight:700;padding:3px 9px;border-radius:999px;flex:none;letter-spacing:.06em}
+  .p-allowed{background:rgba(61,220,145,.14);color:var(--green)}
+  .p-denied{background:rgba(255,90,106,.14);color:var(--red)}
+  .p-pending{background:rgba(249,160,63,.14);color:var(--orange)}
+
+  /* phone push */
+  .topicbox{background:var(--inset);border:1px solid var(--line);border-radius:12px;padding:11px 13px;
+    color:var(--blue-lite);word-break:break-all;font-size:13px;margin:10px 0}
+  .row{display:flex;gap:9px;flex-wrap:wrap}
+
+  /* agent details */
+  .adet{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .adet:last-child{border-bottom:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="navpill">
+    <div class="logo"><span class="mk">&#9672;</span> <div>Judgment Layer<small>for Autonomous Agent Payments</small></div></div>
+    <div class="navspace"></div>
+    <div class="badge" id="status"><span class="dot"></span><span id="statusText">Connecting&hellip;</span></div>
+    <a class="btn dark" href="/landing">Overview</a>
+    <button class="btn ghost" id="reset">Reset</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="intro">
+    <div>
+      <span class="eyebrow">Live Policy Engine</span>
+      <h1>Type a payment request. <span class="accent">Watch it get judged.</span></h1>
+      <p class="lead">Speak as any agent in plain English. Three checks &mdash; deterministic rules, semantic
+        intent, behavioural anomaly &mdash; resolve to <b>Allow</b>, <b>Escalate</b>, or <b>Deny</b> before a rupee moves.</p>
+    </div>
+    <div class="core-wrap">
+      <canvas class="core3d" id="coreConsole" aria-label="Interactive 3D judgment core"></canvas>
+      <div class="corehint">&#9672; Follows your cursor &middot; reacts to every verdict</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="stack">
+      <div class="card glow">
+        <h3>Agents &mdash; choose who you're typing as</h3>
+        <div class="chips" id="chips"></div>
+        <div class="chat" id="chat"></div>
+        <div class="inputrow">
+          <input id="input" placeholder="Type a payment request&hellip; e.g. 'Buy hero image from Unsplash for &#8377;40'" />
+          <button class="btn blue" id="send">Send</button>
+        </div>
+        <div class="quick" id="quick"></div>
+      </div>
+      <div class="card"><h3>Agent details</h3><div id="adet"></div></div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <h3>Policy engine &mdash; real-time checks</h3>
+        <div class="progress"><div class="fill" id="fill"></div></div>
+        <div class="checkcard" id="c-rule"><div class="bar"></div><div class="num">1</div>
+          <div><div class="t">Rule engine</div><div class="d" id="d-rule">Budget &middot; blocked vendors &middot; velocity</div></div></div>
+        <div class="checkcard" id="c-intent"><div class="bar"></div><div class="num">2</div>
+          <div><div class="t">Intent match<span class="tag" id="intentTag">Claude API</span></div><div class="d" id="d-intent">Does the purchase serve the task?</div></div></div>
+        <div class="checkcard" id="c-anomaly"><div class="bar"></div><div class="num">3</div>
+          <div><div class="t">Anomaly score</div><div class="d" id="d-anomaly">Is the amount normal for this agent?</div></div></div>
+        <div class="decision" id="decision"><div class="big"></div><div class="r"></div><div class="lat"></div></div>
+        <div class="waiting" id="waiting">&#9203; Waiting for approval (phone or buttons above)&hellip;</div>
+      </div>
+      <div class="card"><h3>Audit log</h3><div class="log" id="log"><div class="small">No transactions yet.</div></div></div>
+      <div class="card">
+        <h3>Phone push (ntfy.sh)</h3>
+        <div class="small">1. Install the free <b>ntfy</b> app. 2. Subscribe to this topic:</div>
+        <div class="topicbox mono" id="topic"></div>
+        <div class="row">
+          <button class="btn ghost" id="newTopic">New topic</button>
+          <button class="btn ghost" id="testPush">Send test</button>
+        </div>
+        <div class="small" style="margin-top:10px">On escalation your phone gets Approve/Deny; tapping resolves it live here. Most reliable on Android.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// API base: when the backend serves this page (tunnel / deploy) use same origin;
+// for two-server local dev (frontend on :3000) use :8000; ?api= overrides.
+const DEFAULT_API = (location.protocol.startsWith("http") && !location.origin.includes(":3000"))
+  ? location.origin : "http://localhost:8000";
+const API = (new URLSearchParams(location.search).get("api")) || window.GUARDRAIL_API || DEFAULT_API;
+const $ = (s) => document.querySelector(s);
+let AGENTS = [], agentId = "developer", mode = "approve", agentMap = {};
+let topic = localStorage.getItem("gr_topic") || newTopicName();
+let es = null;
+
+function newTopicName(){
+  const r = (self.crypto && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2))
+    .replace(/-/g,"").slice(0,10);
+  const t = "guardrail-" + r; localStorage.setItem("gr_topic", t); return t;
+}
+
+const PRESETS = {
+  approve: [
+    {a:"developer", p:"Buy hero image from Unsplash for ₹40"},
+    {a:"developer", p:"Buy a domain name for ₹120"},
+    {a:"research",  p:"Buy a market report for ₹90"},
+  ],
+  escalate: [
+    {a:"research",  p:"Buy full industry dataset from SimilarWeb for ₹450"},
+    {a:"developer", p:"Purchase GPU cluster rental for ₹5000"},
+    {a:"marketing", p:"Buy influencer shoutout for ₹1800"},
+  ],
+  deny: [
+    {a:"developer", p:"Buy gaming laptop for ₹85000"},
+    {a:"research",  p:"Buy enterprise software for ₹50000"},
+    {a:"marketing", p:"Buy a car for ₹800000"},
+  ],
+};
+
+/* health */
+async function pollHealth(){
+  try{
+    const h = await (await fetch(API+"/health")).json();
+    const el=$("#status"), t=$("#statusText"), d=el.querySelector(".dot");
+    if(h.claude_available){ t.textContent="Online — Claude Live"; d.style.background="var(--green)"; d.style.boxShadow="0 0 8px var(--green)"; $("#intentTag").textContent="Claude API"; }
+    else { t.textContent="Online — Fallback Mode"; d.style.background="var(--blue)"; d.style.boxShadow="0 0 8px var(--glow)"; $("#intentTag").textContent="Fallback"; }
+  }catch(e){ $("#statusText").textContent="Offline — Start Backend"; const d=$("#status").querySelector(".dot"); d.style.background="var(--red)"; d.style.boxShadow="0 0 8px var(--red)"; }
+}
+
+/* agents */
+async function loadAgents(){
+  AGENTS = await (await fetch(API+"/agents")).json();
+  agentMap={}; AGENTS.forEach(a=>agentMap[a.id]=a);
+  const c=$("#chips"); c.innerHTML="";
+  AGENTS.forEach(a=>{
+    const el=document.createElement("div");
+    el.className="chip"+(a.id===agentId?" active":"");
+    el.innerHTML=`<span class="av" style="background:${a.color}">${a.name[0]}</span>${a.name}`;
+    el.onclick=()=>{ agentId=a.id; renderChips(); renderAgent(); };
+    c.appendChild(el);
+  });
+  renderAgent();
+}
+function renderChips(){ [...$("#chips").children].forEach((el,i)=>el.classList.toggle("active",AGENTS[i].id===agentId)); }
+function renderAgent(){
+  const a=agentMap[agentId]; if(!a) return;
+  $("#adet").innerHTML=
+    `<div class="adet"><span class="small">Agent</span><b>${a.name}</b></div>`+
+    `<div class="adet"><span class="small">Task</span><span>${a.task}</span></div>`+
+    `<div class="adet"><span class="small">Budget</span><span class="mono">₹${a.budget.toLocaleString()}</span></div>`+
+    `<div class="adet"><span class="small">Remaining</span><span class="mono" style="color:var(--green)">₹${a.remaining.toLocaleString()}</span></div>`;
+}
+
+/* modes */
+function setMode(m){
+  mode=m;
+  const q=$("#quick"); q.innerHTML="";
+  PRESETS[m].forEach(p=>{
+    const s=document.createElement("span"); s.textContent=p.p;
+    s.onclick=()=>{ agentId=p.a; renderChips(); renderAgent(); $("#input").value=p.p; send(); };
+    q.appendChild(s);
+  });
+}
+
+/* chat */
+function bubble(kind, html, meta){
+  const a=agentMap[agentId];
+  const wrap=document.createElement("div"); wrap.className="msg"+(kind==="me"?" me":"");
+  const av = kind==="me" ? `<span class="av" style="background:${a.color}">${a.name[0]}</span>`
+                         : `<span class="av" style="background:var(--accent)">G</span>`;
+  wrap.innerHTML=av+`<div><div class="body">${html}</div>${meta?`<div class="meta">${meta}</div>`:""}</div>`;
+  $("#chat").appendChild(wrap); $("#chat").scrollTop=$("#chat").scrollHeight;
+}
+
+/* check animation */
+function resetChecks(){
+  ["rule","intent","anomaly"].forEach(k=>{ $("#c-"+k).className="checkcard"; });
+  $("#fill").style.width="0"; $("#decision").className="decision"; $("#waiting").style.display="none";
+  [...document.querySelectorAll(".resolve-row")].forEach(e=>e.remove());
+}
+function setCard(k, cls, desc){ $("#c-"+k).className="checkcard "+cls; if(desc) $("#d-"+k).textContent=desc; }
+
+function animate(tx){
+  resetChecks();
+  const ch=tx.checks;
+  setCard("rule","running");
+  setTimeout(()=>{
+    setCard("rule", ch.rule.passed?"pass":"fail", ch.rule.reason);
+    $("#fill").style.width="33%";
+    if(!ch.rule.passed){
+      setCard("intent","skip","Skipped — hard rule violation.");
+      setCard("anomaly","skip","Skipped — hard rule violation.");
+      $("#fill").style.width="100%"; showDecision(tx); return;
+    }
+    setCard("intent","running");
+    setTimeout(()=>{
+      setCard("intent", ch.intent.match?"pass":"fail", ch.intent.reason);
+      $("#fill").style.width="66%";
+      setCard("anomaly","running");
+      setTimeout(()=>{
+        setCard("anomaly", ch.anomaly.flagged?"fail":"pass", ch.anomaly.reason);
+        $("#fill").style.width="100%"; showDecision(tx);
+      }, 500);
+    }, 800);
+  }, 400);
+}
+
+function showDecision(tx){
+  const d=$("#decision");
+  d.className="decision show d-"+tx.decision;
+  d.querySelector(".big").textContent=(tx.decision==="ALLOWED"?"✅ ":tx.decision==="ESCALATED"?"⚠️ ":"🚫 ")+tx.decision;
+  d.querySelector(".r").textContent=tx.reason;
+  d.querySelector(".lat").textContent=`${tx.latency_ms} ms · ${tx.claude_used?"Claude":"fallback"} intent`;
+  const col = tx.decision==="ALLOWED"?"green":tx.decision==="DENIED"?"red":"orange";
+  const pulseHex = tx.decision==="ALLOWED"?"#3ddc91":tx.decision==="DENIED"?"#ff5a6a":"#f9a03f";
+  if(window.__core) window.__core.pulse(pulseHex);
+  bubble("guard", `<b style="color:var(--${col})">${tx.decision}</b> — ${tx.reason}`, `${tx.id} · ${tx.latency_ms}ms`);
+  if(tx.decision==="ESCALATED"){
+    $("#waiting").style.display="block";
+    const row=document.createElement("div"); row.className="resolve-row";
+    row.innerHTML=`<button class="btn" style="background:var(--green);color:#00241a" id="rApprove">Approve</button>`+
+                  `<button class="btn" style="background:var(--red);color:#2a0007" id="rDeny">Deny</button>`;
+    d.appendChild(row);
+    const doResolve=async(ok)=>{
+      try{ await fetch(API+"/resolve",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({transaction_id:tx.id, approved:ok})}); }catch(_){}
+      finishResolve(tx.id);
+    };
+    $("#rApprove").onclick=()=>doResolve(true); $("#rDeny").onclick=()=>doResolve(false);
+    watchResolution(tx.id);
+  }
+  refresh();
+}
+
+async function finishResolve(txid){
+  [...document.querySelectorAll(".resolve-row")].forEach(e=>e.remove());
+  $("#waiting").style.display="none";
+  const list=await (await fetch(API+"/transactions?limit=50")).json();
+  const cur=list.find(t=>t.id===txid);
+  if(cur){
+    const d=$("#decision"); d.className="decision show d-"+cur.decision;
+    d.querySelector(".big").textContent=(cur.decision==="ALLOWED"?"✅ ":"🚫 ")+cur.decision+" (human)";
+    d.querySelector(".r").textContent=cur.reason;
+  }
+  refresh();
+  if(resumeAuto){ const r=resumeAuto; resumeAuto=null; setTimeout(r,700); }  // continue the auto-run
+}
+
+/* poll fallback in case resolution came from the phone */
+function watchResolution(txid){
+  let n=0;
+  const iv=setInterval(async ()=>{
+    n++;
+    const list=await (await fetch(API+"/transactions?limit=50")).json();
+    const cur=list.find(t=>t.id===txid);
+    if(cur && cur.status!=="pending"){ clearInterval(iv); finishResolve(txid); }
+    if(n>150) clearInterval(iv);
+  }, 2000);
+}
+
+/* auto-play: one prompt streams the whole 25-log sequence into the audit log,
+   one transaction at a time — no need to type each request individually. */
+const sleep = (ms) => new Promise(r=>setTimeout(r,ms));
+let flowRunning=false, resumeAuto=null;
+
+const FLOW = [
+  {a:"developer", p:"Buy hero image from Unsplash for ₹40"},
+  {a:"developer", p:"Buy an icon pack for ₹60"},
+  {a:"research",  p:"Buy a market report for ₹90"},
+  {a:"developer", p:"Buy a domain name for ₹120"},
+  {a:"marketing", p:"Buy stock photos for ₹210"},
+  {a:"developer", p:"Buy a font license for ₹75"},
+  {a:"research",  p:"Buy a competitor analysis PDF for ₹110"},
+  {a:"developer", p:"Buy an SSL certificate for ₹150"},
+  {a:"marketing", p:"Boost a social post for ₹260"},
+  {a:"developer", p:"Buy a UI component kit for ₹95"},
+  {a:"research",  p:"Buy survey credits for ₹85"},
+  {a:"developer", p:"Buy a logo template for ₹130"},
+  {a:"marketing", p:"Buy email campaign credits for ₹280"},
+  {a:"developer", p:"Buy a gaming laptop for ₹85000"},          /* 14 → DENIED */
+  {a:"developer", p:"Buy a code linter subscription for ₹140"},
+  {a:"research",  p:"Buy a dataset sample for ₹90"},
+  {a:"marketing", p:"Buy a banner design for ₹240"},
+  {a:"developer", p:"Buy a testing tool license for ₹160"},
+  {a:"developer", p:"Purchase GPU cluster rental for ₹5000"},   /* 19 → ESCALATED */
+  {a:"developer", p:"Buy a favicon set for ₹50"},
+  {a:"research",  p:"Buy a trends report for ₹100"},
+  {a:"marketing", p:"Buy ad creatives for ₹270"},
+  {a:"developer", p:"Buy a staging server hour for ₹120"},
+  {a:"research",  p:"Buy an academic paper for ₹95"},
+  {a:"developer", p:"Buy a placeholder image pack for ₹45"},
+];
+
+/* quick check-flash + decision; resolves once the row has landed in the log */
+function autoAnimate(tx){
+  return new Promise(res=>{
+    resetChecks();
+    const ch=tx.checks;
+    setCard("rule","running"); setCard("intent","running"); setCard("anomaly","running");
+    setTimeout(()=>{
+      setCard("rule", ch.rule.passed?"pass":"fail", ch.rule.reason);
+      if(!ch.rule.passed){
+        setCard("intent","skip","Skipped — hard rule violation.");
+        setCard("anomaly","skip","Skipped — hard rule violation.");
+      } else {
+        setCard("intent", ch.intent.match?"pass":"fail", ch.intent.reason);
+        setCard("anomaly", ch.anomaly.flagged?"fail":"pass", ch.anomaly.reason);
+      }
+      $("#fill").style.width="100%";
+      showDecision(tx);
+      res();
+    }, 380);
+  });
+}
+
+async function send(){
+  if(flowRunning) return;                       // ignore extra clicks while a run is playing
+  const typed=$("#input").value.trim();
+  const firstMsg = typed || FLOW[0].p;
+  $("#input").value="";
+  flowRunning=true; $("#send").disabled=true; $("#input").disabled=true;
+  try{ await fetch(API+"/reset",{method:"POST"}); }catch(_){}   // fresh 25-log run each time
+  $("#chat").innerHTML=""; resetChecks(); await refresh();
+  try{
+    for(let n=1;n<=FLOW.length;n++){
+      const req = (n===1) ? {a:agentId, p:firstMsg} : FLOW[n-1];
+      agentId=req.a; renderChips(); renderAgent();
+      bubble("me", req.p);
+      let tx;
+      try{
+        tx=await (await fetch(API+"/chat-prompt",{ method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({agent_id:agentId, message:req.p, notify_topic:topic}) })).json();
+      }catch(e){ bubble("guard", `<span style="color:var(--red)">Backend error: ${e.message||e}</span>`); break; }
+      if(tx.ended){ bubble("guard", `<b style="color:var(--orange)">${tx.message}</b>`); break; }
+      await autoAnimate(tx);
+      if(tx.decision==="ESCALATED"){
+        await new Promise(res=>{ resumeAuto=res; });   // pause for phone / button approval, then resume
+      } else {
+        await sleep(600);
+      }
+    }
+  } finally {
+    flowRunning=false; $("#send").disabled=false; $("#input").disabled=false; $("#input").focus();
+  }
+}
+
+/* phone taps arrive on <topic>-action via SSE; relay to /resolve */
+function subscribe(){
+  if(es) es.close();
+  es=new EventSource(`https://ntfy.sh/${topic}-action/sse`);
+  es.onmessage=async(e)=>{
+    try{
+      const data=JSON.parse(e.data);
+      if(data.event!=="message" || !data.message) return;
+      const [action, txid]=String(data.message).split("|");
+      if((action==="approve"||action==="deny") && txid){
+        await fetch(API+"/resolve",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({transaction_id:txid, approved:action==="approve"})});
+        finishResolve(txid);
+      }
+    }catch(_){}
+  };
+}
+
+/* audit + refresh */
+async function refresh(){
+  try{
+    AGENTS=await (await fetch(API+"/agents")).json();
+    agentMap={}; AGENTS.forEach(a=>agentMap[a.id]=a); renderAgent();
+    const list=await (await fetch(API+"/transactions?limit=50")).json();
+    const log=$("#log");
+    if(!list.length){ log.innerHTML='<div class="small">No transactions yet.</div>'; return; }
+    log.innerHTML="";
+    list.forEach(t=>{
+      const cls=t.status==="allowed"?"p-allowed":t.status==="denied"?"p-denied":"p-pending";
+      const el=document.createElement("div"); el.className="logitem";
+      el.innerHTML=`<span class="pill ${cls}">${t.status.toUpperCase()}</span><span>${t.agent_name}</span>`+
+        `<span class="mono">₹${t.amount.toLocaleString()}</span>`+
+        `<span class="small" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.description}</span>`+
+        `<span class="small mono">${t.latency_ms}ms</span>`;
+      log.appendChild(el);
+    });
+  }catch(e){}
+}
+
+/* phone + reset */
+function renderTopic(){ $("#topic").textContent=topic; }
+$("#newTopic").onclick=()=>{ topic=newTopicName(); renderTopic(); subscribe(); };
+$("#testPush").onclick=async()=>{ try{ await fetch("https://ntfy.sh/"+topic,{method:"POST",body:"Judgment Layer test — your phone is connected."}); }catch(_){} };
+$("#reset").onclick=async()=>{ try{ await fetch(API+"/reset",{method:"POST"}); }catch(_){} resetChecks(); $("#chat").innerHTML=""; refresh(); };
+
+/* wire */
+$("#send").onclick=send;
+$("#input").addEventListener("keydown",e=>{ if(e.key==="Enter") send(); });
+
+(async function init(){
+  renderTopic(); subscribe();
+  await loadAgents(); setMode("approve"); pollHealth(); refresh();
+  setInterval(pollHealth,5000);
+})();
+</script>
+
+<!-- ===== Judgment Core: self-contained interactive 3D node-sphere (no libraries) ===== -->
+<script>
+function initJudgmentCore(canvas, opts){
+  opts = opts || {};
+  const ctx = canvas.getContext('2d');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const BLUE = [46,155,255];
+  const N = opts.nodes || 110;
+
+  const pts = [], GA = Math.PI*(3-Math.sqrt(5));
+  for(let i=0;i<N;i++){
+    const y = 1-(i/(N-1))*2, r = Math.sqrt(Math.max(0,1-y*y)), t = GA*i;
+    pts.push({x:Math.cos(t)*r, y:y, z:Math.sin(t)*r, tw:Math.random()*6.28});
+  }
+  const rings = [
+    {a:1.30, tiltX:0.55, tiltZ:0.20, spd:0.50, phase:0.0},
+    {a:1.02, tiltX:-0.90, tiltZ:0.60, spd:-0.80, phase:2.1},
+    {a:1.55, tiltX:1.15, tiltZ:-0.30, spd:0.32, phase:4.0},
+  ];
+
+  let W=0,H=0,CX=0,CY=0,R=0,dpr=1;
+  const baseYaw=0.4, basePitch=-0.2;
+  let yaw=baseYaw, pitch=basePitch, tYaw=baseYaw, tPitch=basePitch;
+  let pulse=0, pulseRGB=BLUE, t0=0, raf=0;
+
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    W=Math.max(1,rect.width); H=Math.max(1,rect.height);
+    dpr=Math.min(2, window.devicePixelRatio||1);
+    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    CX=W/2; CY=H/2; R=Math.min(W,H)*0.34;
+  }
+  function rotP(x,y,z){
+    const cy=Math.cos(yaw), sy=Math.sin(yaw);
+    let X=x*cy - z*sy, Z=x*sy + z*cy;
+    const cx=Math.cos(pitch), sx=Math.sin(pitch);
+    let Y=y*cx - Z*sx; Z=y*sx + Z*cx;
+    return [X,Y,Z];
+  }
+  const PSP=2.6;
+  function proj(X,Y,Z){ const s=PSP/(PSP-Z); return [CX+X*R*s, CY+Y*R*s, s]; }
+  function col(rgb,a){ return 'rgba('+rgb[0]+','+rgb[1]+','+rgb[2]+','+a+')'; }
+  function mix(a,b,t){ return [Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)]; }
+  function tiltPoint(a,rg){
+    let x=Math.cos(a)*rg.a, y=0, z=Math.sin(a)*rg.a;
+    let y2=y*Math.cos(rg.tiltX)-z*Math.sin(rg.tiltX), z2=y*Math.sin(rg.tiltX)+z*Math.cos(rg.tiltX); y=y2; z=z2;
+    let x2=x*Math.cos(rg.tiltZ)-y*Math.sin(rg.tiltZ), y3=x*Math.sin(rg.tiltZ)+y*Math.cos(rg.tiltZ); x=x2; y=y3;
+    return rotP(x,y,z);
+  }
+
+  function draw(ts){
+    if(!t0) t0=ts; const time=(ts-t0)/1000;
+    yaw += (tYaw-yaw)*0.07; pitch += (tPitch-pitch)*0.07;
+    pitch=Math.max(-1.1,Math.min(1.1,pitch));
+    if(pulse>0) pulse=Math.max(0,pulse-0.014);
+    const cur = pulse>0 ? mix(BLUE,pulseRGB,pulse) : BLUE;
+
+    ctx.clearRect(0,0,W,H);
+    ctx.globalCompositeOperation='lighter';
+
+    const coreR = R*(0.30+0.05*Math.sin(time*2)) + pulse*R*0.14;
+    let g=ctx.createRadialGradient(CX,CY,0,CX,CY,coreR*2.3);
+    g.addColorStop(0, col(cur,0.5+0.28*pulse)); g.addColorStop(0.4, col(cur,0.13)); g.addColorStop(1, col(cur,0));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY,coreR*2.3,0,6.2832); ctx.fill();
+    g=ctx.createRadialGradient(CX-coreR*0.3,CY-coreR*0.3,0,CX,CY,coreR);
+    g.addColorStop(0,col(mix(cur,[255,255,255],0.55),0.9)); g.addColorStop(1,col(cur,0.12));
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY,coreR,0,6.2832); ctx.fill();
+
+    for(const rg of rings){
+      ctx.beginPath(); const seg=72;
+      for(let k=0;k<=seg;k++){ const [X,Y,Z]=tiltPoint(k/seg*6.2832,rg); const s=PSP/(PSP-Z); const sx=CX+X*R*s, sy=CY+Y*R*s; k?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy); }
+      ctx.strokeStyle=col(cur,0.15); ctx.lineWidth=1; ctx.stroke();
+      const [X,Y,Z]=tiltPoint(time*rg.spd+rg.phase,rg); const [sx,sy,s]=proj(X,Y,Z);
+      ctx.fillStyle=col(mix(cur,[255,255,255],0.45),0.9); ctx.beginPath(); ctx.arc(sx,sy,2.4*s,0,6.2832); ctx.fill();
+    }
+
+    const pr=[];
+    for(const p of pts){ const [X,Y,Z]=rotP(p.x,p.y,p.z); const [sx,sy,s]=proj(X,Y,Z); pr.push({sx,sy,z:Z,s,tw:p.tw}); }
+    pr.sort((a,b)=>a.z-b.z);
+    const TH=R*0.42, TH2=TH*TH;
+    ctx.lineWidth=1;
+    for(let i=0;i<pr.length;i++){ const A=pr[i];
+      for(let j=i+1;j<pr.length;j++){ const B=pr[j]; const dx=A.sx-B.sx, dy=A.sy-B.sy, d2=dx*dx+dy*dy;
+        if(d2<TH2){ const dep=(A.z+B.z)/2, a=(1-Math.sqrt(d2)/TH)*0.2*(0.4+0.6*(dep+1)/2);
+          if(a>0.02){ ctx.strokeStyle=col(cur,a); ctx.beginPath(); ctx.moveTo(A.sx,A.sy); ctx.lineTo(B.sx,B.sy); ctx.stroke(); } } } }
+    for(const q of pr){ const dep=(q.z+1)/2; let a=(0.2+0.7*dep)*(0.75+0.25*Math.sin(time*2+q.tw));
+      ctx.fillStyle=col(mix(cur,[255,255,255],0.15*dep),a); ctx.beginPath(); ctx.arc(q.sx,q.sy,(0.9+1.5*q.s)*(0.7+0.5*dep),0,6.2832); ctx.fill(); }
+
+    ctx.globalCompositeOperation='source-over';
+    raf=requestAnimationFrame(draw);
+  }
+
+  function P(e){ const t=e.touches&&e.touches[0]; return {x:(t?t.clientX:e.clientX), y:(t?t.clientY:e.clientY)}; }
+  function track(e){ const p=P(e); const rect=canvas.getBoundingClientRect();
+    const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+    let nx=(p.x-cx)/(window.innerWidth/2), ny=(p.y-cy)/(window.innerHeight/2);
+    nx=Math.max(-1.4,Math.min(1.4,nx)); ny=Math.max(-1.4,Math.min(1.4,ny));
+    tYaw=baseYaw+nx*0.9; tPitch=basePitch+ny*0.55; }
+  window.addEventListener('pointermove',track);
+  window.addEventListener('pointerdown',track);
+  const ro=('ResizeObserver' in window)?new ResizeObserver(resize):null;
+  if(ro) ro.observe(canvas); else window.addEventListener('resize',resize);
+  resize(); raf=requestAnimationFrame(draw);
+  canvas.style.cursor='default'; canvas.style.touchAction='none';
+
+  function hexToRgb(h){ if(!h)return null; h=(''+h).replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+  return { pulse:function(hex){ pulseRGB=hexToRgb(hex)||BLUE; pulse=1; }, destroy:function(){ cancelAnimationFrame(raf); if(ro)ro.disconnect(); } };
+}
+  const _c=document.getElementById('coreConsole');
+  window.__core = _c ? initJudgmentCore(_c,{nodes:100}) : null;
+</script>
+</body>
+</html>

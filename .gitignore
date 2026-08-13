@@ -1,0 +1,33 @@
+# Secrets — never commit
+backend/.env
+frontend/.env
+guardrail/.env
+*.env
+!*.env.example
+
+# Python
+backend/.venv/
+guardrail/.venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / frontend build
+frontend/node_modules/
+frontend/dist/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# local binaries
+guardrail/cloudflared.exe
+
+# SQLite runtime db (live demo) — regenerated on first run
+backend/backend.db
+backend.db
+guardrail/guardrail.db
+guardrail/guardrail.db-journal
+guardrail/guardrail.db-wal
+guardrail/guardrail.db-shm
