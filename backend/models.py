@@ -1,50 +1,81 @@
-"""ORM models — column-for-column mirror of db/schema.sql (BUILD_PLAN.md §4)."""
-import uuid
+"""ORM models for Sentra Authority Engine matching the Playbook requirement.
 
-from sqlalchemy import ForeignKey, JSON, Numeric, String, Text, UUID, Float, func
+Tables:
+- protected_resources (id, label, state, updated_at)
+- authority_events (id, sequence, request_hash, decision, reason_code, previous_hash, event_hash, created_at, payload)
+- capabilities (id, request_hash, scope, signature, expires_at, status, consumed_at, nonce)
+- demo_runs (id, scenario, started_at, completed_at, outcome)
+- policy_versions (id, version, rules_digest, created_at)
+"""
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import JSON, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import DateTime
 
 from database import Base
 
 
-class Agent(Base):
-    __tablename__ = "agents"
+class ProtectedResource(Base):
+    __tablename__ = "protected_resources"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)  # slug id
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    task: Mapped[str] = mapped_column(String, nullable=False)
-    budget: Mapped[float] = mapped_column(Numeric, nullable=False)
-    balance: Mapped[float] = mapped_column(Numeric, nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    state: Mapped[dict] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
 
 
-class Transaction(Base):
-    __tablename__ = "transactions"
+class AuthorityEvent(Base):
+    __tablename__ = "authority_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
+    request_hash: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    decision: Mapped[str] = mapped_column(String, nullable=False)  # ALLOW | DENY | ESCALATE | FREEZE
+    reason_code: Mapped[str] = mapped_column(String, nullable=False)
+    previous_hash: Mapped[str] = mapped_column(String, nullable=False)
+    event_hash: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
-    agent_id: Mapped[str] = mapped_column(
-        String, ForeignKey("agents.id"), nullable=False
+
+
+class Capability(Base):
+    __tablename__ = "capabilities"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    request_hash: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    scope: Mapped[dict] = mapped_column(JSON, nullable=False)
+    signature: Mapped[str] = mapped_column(String, nullable=False)
+    nonce: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="issued")  # issued | consumed | expired | revoked | rejected
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
-    amount: Mapped[float] = mapped_column(Numeric, nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    decision: Mapped[str] = mapped_column(Text, nullable=False)      # allow|escalate|deny
-    status: Mapped[str] = mapped_column(Text, nullable=False)        # allowed|denied|pending|approved
-    reason: Mapped[str] = mapped_column(Text, nullable=False)
-    triggered_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    intent_source: Mapped[str | None] = mapped_column(Text, nullable=True)
-    checks: Mapped[dict] = mapped_column(JSON, nullable=False)
-    risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
-    risk_factors: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    llm_authority: Mapped[str | None] = mapped_column(Text, nullable=True)
-    processing_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
-    created_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
-    resolved_at: Mapped[DateTime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+
+
+class DemoRun(Base):
+    __tablename__ = "demo_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    scenario: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    outcome: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class PolicyVersion(Base):
+    __tablename__ = "policy_versions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    version: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    rules_digest: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )

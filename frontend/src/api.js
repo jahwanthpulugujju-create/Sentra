@@ -1,5 +1,3 @@
-// Thin fetch wrappers for every backend endpoint (BUILD_PLAN.md §8).
-// No business logic here — the backend owns all decisions.
 const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 async function req(path, opts) {
@@ -7,7 +5,8 @@ async function req(path, opts) {
   if (!res.ok) {
     let detail = "";
     try {
-      detail = (await res.json()).detail || "";
+      const json = await res.json();
+      detail = json.detail ? (typeof json.detail === "object" ? JSON.stringify(json.detail) : json.detail) : "";
     } catch {
       /* ignore */
     }
@@ -24,11 +23,10 @@ const jsonPost = (path, body) =>
   });
 
 export const getHealth = () => req("/health");
-export const getAgents = () => req("/agents");
-export const getTransactions = (limit = 50) => req(`/transactions?limit=${limit}`);
-export const evaluate = (body) => jsonPost("/evaluate-transaction", body);
-export const reset = () => req("/reset", { method: "POST" });
-
-// Defined for M4 (escalation resolve) — the route is not built until M4.
-export const resolve = (body) => jsonPost("/resolve-escalation", body);
-export const getMetrics = () => req("/metrics");
+export const getDashboard = () => req("/dashboard");
+export const evaluate = (body) => jsonPost("/evaluate", body);
+export const verifyAndExecute = (body) => jsonPost("/verify-and-execute", body);
+export const runScenario = (scenario) => jsonPost("/run-scenario", { scenario });
+export const verifyProofChain = () => req("/proof-chain/verify");
+export const resetDemo = () => req("/reset-demo", { method: "POST" });
+export const getReplay = (eventId) => req(`/replay/${eventId}`);

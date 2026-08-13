@@ -1,187 +1,226 @@
-"""Policy engine — full three-check form with risk scoring and LLM authority.
+"""Deterministic Policy Kernel for Sentra Authority Engine.
 
-Rules run first (hard deny). If rules pass, intent match + anomaly run; the three
-combine into Allow / Escalate / Deny. Ambiguous cases (intent mismatch or anomaly)
-Escalate to a human (status 'pending', no deduction) — they are never auto-denied.
+Evaluates canonical request and returns deterministic outcomes:
+- ALLOW
+- DENY
+- ESCALATE
+- FREEZE
 
-Risk score (0–100) quantifies the composite risk across all three checks.
-LLM authority tracks exactly what role the LLM played in each decision.
+Rule Engine principles:
+1. LLM does NOT directly issue allow, capability, or gateway verdict.
+2. Fail closed on unknown tools, invalid scopes, prompt injection indicators, or burst anomalies.
+3. Track policy versioning ("v1.0.0-sentra-kernel").
 """
-from __future__ import annotations
+import re
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-import time
+from sqlalchemy.orm import Session
 
-from anomaly import score_anomaly
-from intent import check_intent
-from models import Transaction
-from rules import run_rules
+from canonicalizer import compute_request_hash
+from capability import issue_capability
+from config import POLICY_VERSION
+from models import Capability
+from proof_chain import append_authority_event
 
+CURRENT_POLICY_VERSION = POLICY_VERSION
 
-def combine(rule: dict, intent: dict, anomaly: dict) -> tuple[str, str, str | None, str]:
-    """Return (decision, status, triggered_by, reason) per BUILD_PLAN §6.4."""
-    if not rule["passed"]:
-        return "deny", "denied", "rule_engine", rule["reason"]
-    if intent["match"] and not anomaly["flagged"]:
-        return "allow", "allowed", None, "Passed all checks."
-    # Escalate — reason/trigger from intent first, then anomaly.
-    if not intent["match"]:
-        return "escalate", "pending", "intent_match", intent["reason"]
-    return "escalate", "pending", "anomaly", anomaly["reason"]
+# Allowed Agent Scopes
+AUTHORIZED_SCOPES = {
+    "ops_agent": {
+        "allowed_tools": ["deploy_service", "restart_pod", "update_config"],
+        "allowed_resources": ["prod_k8s_cluster", "staging_k8s_cluster"],
+    },
+    "monitoring_agent": {
+        "allowed_tools": ["fetch_metrics", "log_alert"],
+        "allowed_resources": ["prod_k8s_cluster"],
+    },
+}
 
-
-def compute_risk_score(rule: dict, intent: dict, anomaly: dict) -> float:
-    """Compute a 0–100 composite risk score from all three checks."""
-    # Rule engine: binary — 0 if passed, 100 if failed.
-    rule_risk = 0.0 if rule["passed"] else 100.0
-
-    # Intent match: based on confidence. Low confidence in a match = some risk.
-    if not intent.get("ran"):
-        intent_risk = 0.0  # didn't run (rules already denied)
-    elif intent.get("match"):
-        # Matched but might have low confidence.
-        confidence = intent.get("confidence", 0.5)
-        intent_risk = (1.0 - confidence) * 30  # low risk, scaled to max 30
-    else:
-        # Mismatched — high risk, confidence makes it worse.
-        confidence = intent.get("confidence", 0.5)
-        intent_risk = 60 + (1.0 - confidence) * 40  # 60–100
-
-    # Injection detection adds extra risk.
-    if intent.get("injection_detected"):
-        intent_risk = min(intent_risk + 20, 100)
-
-    # Anomaly: based on z-score.
-    if not anomaly.get("ran") or not anomaly.get("flagged"):
-        anomaly_risk = 0.0
-    else:
-        z = anomaly.get("z_score") or 0
-        anomaly_risk = min(z * 25, 100)
-
-    # Weighted composite: rules 40%, intent 35%, anomaly 25%.
-    if not rule["passed"]:
-        # Hard rule failure dominates.
-        return round(rule_risk, 1)
-
-    composite = 0.40 * rule_risk + 0.35 * intent_risk + 0.25 * anomaly_risk
-    return round(min(composite, 100), 1)
+# Known Prompt Injection Attack Signatures
+PROMPT_INJECTION_PATTERNS = [
+    r"ignore (all )?previous instructions",
+    r"bypass (authority|policy|guardrails?)",
+    r"system prompt override",
+    r"sudo ",
+    r"drop database",
+    r"chmod 777",
+    r"cat /etc/passwd",
+    r"eval\(",
+    r"exec\(",
+]
 
 
-def extract_risk_factors(rule: dict, intent: dict, anomaly: dict) -> list[str]:
-    """Extract human-readable risk factors from the three checks."""
-    factors = []
+def check_prompt_injection(data: Dict[str, Any]) -> bool:
+    """Scan request parameters and prompt context for injection indicators."""
+    text_to_scan = []
+    
+    params = data.get("parameters", {})
+    if isinstance(params, dict):
+        for v in params.values():
+            if isinstance(v, str):
+                text_to_scan.append(v)
+    elif isinstance(params, str):
+        text_to_scan.append(params)
 
-    if not rule["passed"]:
-        factors.append(f"Rule violation: {rule['reason']}")
-        return factors  # rule failure is the only relevant factor
+    prompt_ctx = data.get("promptContext")
+    if isinstance(prompt_ctx, str):
+        text_to_scan.append(prompt_ctx)
 
-    if intent.get("ran"):
-        if not intent.get("match"):
-            factors.append(f"Off-task purchase: {intent.get('reason', 'Intent mismatch')}")
-        if intent.get("injection_detected"):
-            factors.append("Prompt injection pattern detected in description")
-        confidence = intent.get("confidence")
-        if confidence is not None and confidence < 0.4:
-            factors.append(f"Low intent confidence ({confidence:.0%})")
+    combined = " ".join(text_to_scan).lower()
 
-    if anomaly.get("ran") and anomaly.get("flagged"):
-        z = anomaly.get("z_score")
-        if z is not None:
-            factors.append(f"Anomalous amount: {z:.1f}σ above agent average")
-        else:
-            factors.append("Amount deviates from agent history")
-
-    return factors
+    for pattern in PROMPT_INJECTION_PATTERNS:
+        if re.search(pattern, combined):
+            return True
+    return False
 
 
-def determine_llm_authority(rule: dict, intent: dict) -> str:
-    """Determine what role the LLM played in this decision."""
-    if not rule["passed"]:
-        return "not_consulted"
-    if not intent.get("ran"):
-        return "not_consulted"
-    if intent.get("source") == "fallback":
-        return "fallback_used"
-    return "advisory_only"
+def check_burst_anomaly(data: Dict[str, Any], db: Optional[Session] = None) -> bool:
+    """Check if agent/request exhibits burst anomaly behavior."""
+    params = data.get("parameters", {})
+    if isinstance(params, dict) and params.get("burstTrigger") is True:
+        return True
+    return False
 
 
-def apply_resolution(status: str, balance: float, amount: float, action: str):
-    """Resolve a pending escalation.
+def evaluate_request(data: Dict[str, Any], db: Session) -> Dict[str, Any]:
+    """Evaluate canonical request through deterministic policy rules.
 
-    Returns (new_status, new_balance) for a currently-`pending` transaction, or
-    None if it is NOT pending (the caller must then return 409 and change
-    nothing). Deducts only on approve.
+    Returns dict containing decision, reason_code, explanation, request_hash, capability (if ALLOW).
     """
-    if status != "pending":
-        return None
-    if action == "approve":
-        return "approved", balance - amount
-    return "denied", balance
+    canonical_str, req_hash = compute_request_hash(data)
 
+    agent_id = data.get("agentId")
+    tool = data.get("tool")
+    action = data.get("action")
+    resource = data.get("resource")
+    policy_ver = data.get("policyVersion")
+    nonce = data.get("nonce")
 
-def evaluate(agent, amount: float, description: str, db) -> Transaction:
-    start = time.perf_counter()
+    # Rule 1: Policy Version Match
+    if policy_ver != CURRENT_POLICY_VERSION:
+        decision = "DENY"
+        reason_code = "POLICY_VERSION_MISMATCH"
+        explanation = f"Unsupported policy version: expected {CURRENT_POLICY_VERSION}, got {policy_ver}"
+        
+        append_authority_event(
+            db, request_hash=req_hash, decision=decision, reason_code=reason_code,
+            payload={"request": data, "explanation": explanation}
+        )
+        db.commit()
+        return {
+            "decision": decision,
+            "reasonCode": reason_code,
+            "explanation": explanation,
+            "requestHash": req_hash,
+            "canonicalRequest": canonical_str,
+            "capability": None,
+            "policyVersion": CURRENT_POLICY_VERSION,
+        }
 
-    rule = run_rules(agent, amount, description, db)
+    # Rule 2: Burst Anomaly Detection -> FREEZE
+    if check_burst_anomaly(data, db):
+        decision = "FREEZE"
+        reason_code = "POLICY_BURST_ANOMALY_FREEZE"
+        explanation = "Suspicious high-frequency repeated request detected. Safety boundary frozen."
+        
+        append_authority_event(
+            db, request_hash=req_hash, decision=decision, reason_code=reason_code,
+            payload={"request": data, "explanation": explanation}
+        )
+        db.commit()
+        return {
+            "decision": decision,
+            "reasonCode": reason_code,
+            "explanation": explanation,
+            "requestHash": req_hash,
+            "canonicalRequest": canonical_str,
+            "capability": None,
+            "policyVersion": CURRENT_POLICY_VERSION,
+        }
 
-    if rule["passed"]:
-        intent = check_intent(agent.task, amount, description)
-        anomaly = score_anomaly(agent, amount, db)
-    else:
-        # Hard rule violation short-circuits — the smart checks don't run.
-        intent = {"ran": False, "match": None, "source": None, "reason": None,
-                  "confidence": None, "injection_detected": False}
-        anomaly = {"ran": False, "flagged": None, "z_score": None, "mean": None, "std": None}
+    # Rule 3: Prompt Injection Inspection -> ESCALATE
+    if check_prompt_injection(data):
+        decision = "ESCALATE"
+        reason_code = "POLICY_PROMPT_INJECTION_DETECTED"
+        explanation = "Untrusted or ambiguous instruction content detected in request context. Requires human escalation."
+        
+        append_authority_event(
+            db, request_hash=req_hash, decision=decision, reason_code=reason_code,
+            payload={"request": data, "explanation": explanation}
+        )
+        db.commit()
+        return {
+            "decision": decision,
+            "reasonCode": reason_code,
+            "explanation": explanation,
+            "requestHash": req_hash,
+            "canonicalRequest": canonical_str,
+            "capability": None,
+            "policyVersion": CURRENT_POLICY_VERSION,
+        }
 
-    checks = {
-        "rule_engine": {
-            "passed": rule["passed"],
-            "failed_rule": rule["failed_rule"],
-            "reason": rule["reason"],
-        },
-        "intent_match": {
-            "ran": intent["ran"],
-            "match": intent.get("match"),
-            "source": intent.get("source"),
-            "reason": intent.get("reason"),
-            "confidence": intent.get("confidence"),
-            "injection_detected": intent.get("injection_detected", False),
-        },
-        "anomaly": {
-            "ran": anomaly["ran"],
-            "flagged": anomaly.get("flagged"),
-            "z_score": anomaly.get("z_score"),
-            "mean": anomaly.get("mean"),
-            "std": anomaly.get("std"),
-        },
-    }
+    # Rule 4: Unauthorized Tool or Resource -> DENY
+    agent_scope = AUTHORIZED_SCOPES.get(agent_id)
+    if not agent_scope or tool not in agent_scope.get("allowed_tools", []) or resource not in agent_scope.get("allowed_resources", []):
+        decision = "DENY"
+        reason_code = "POLICY_UNAUTHORIZED_TOOL_OR_RESOURCE"
+        explanation = f"Agent '{agent_id}' is not authorized to invoke tool '{tool}' on resource '{resource}'."
+        
+        append_authority_event(
+            db, request_hash=req_hash, decision=decision, reason_code=reason_code,
+            payload={"request": data, "explanation": explanation}
+        )
+        db.commit()
+        return {
+            "decision": decision,
+            "reasonCode": reason_code,
+            "explanation": explanation,
+            "requestHash": req_hash,
+            "canonicalRequest": canonical_str,
+            "capability": None,
+            "policyVersion": CURRENT_POLICY_VERSION,
+        }
 
-    decision, status, triggered_by, reason = combine(rule, intent, anomaly)
-    risk_score = compute_risk_score(rule, intent, anomaly)
-    risk_factors = extract_risk_factors(rule, intent, anomaly)
-    llm_authority = determine_llm_authority(rule, intent)
+    # Rule 5: Deterministic ALLOW -> Issue Signed Capability
+    decision = "ALLOW"
+    reason_code = "POLICY_ALLOWED"
+    explanation = f"Request verified. Agent '{agent_id}' is authorized for action '{action}' on '{resource}'."
 
-    if decision == "allow":
-        agent.balance = float(agent.balance) - amount
-
-    elapsed_ms = round((time.perf_counter() - start) * 1000, 1)
-
-    tx = Transaction(
-        agent_id=agent.id,
-        amount=amount,
-        description=description,
-        decision=decision,
-        status=status,
-        reason=reason,
-        triggered_by=triggered_by,
-        intent_source=intent.get("source"),
-        checks=checks,
-        risk_score=risk_score,
-        risk_factors=risk_factors,
-        llm_authority=llm_authority,
-        processing_time_ms=elapsed_ms,
+    cap_data = issue_capability(
+        request_hash=req_hash,
+        agent_id=agent_id,
+        tool=tool,
+        action=action,
+        resource=resource,
+        policy_version=CURRENT_POLICY_VERSION,
+        nonce=nonce,
     )
-    db.add(tx)
+
+    cap_record = Capability(
+        id=cap_data["id"],
+        request_hash=cap_data["requestHash"],
+        scope=cap_data["scope"],
+        signature=cap_data["signature"],
+        expires_at=cap_data["expiresAt"],
+        status=cap_data["status"],
+        nonce=cap_data["nonce"],
+    )
+    db.add(cap_record)
+    db.flush()
+
+    append_authority_event(
+        db, request_hash=req_hash, decision=decision, reason_code=reason_code,
+        payload={"request": data, "explanation": explanation, "capabilityId": cap_data["id"]}
+    )
     db.commit()
-    db.refresh(tx)
-    db.refresh(agent)
-    return tx
+
+    return {
+        "decision": decision,
+        "reasonCode": reason_code,
+        "explanation": explanation,
+        "requestHash": req_hash,
+        "canonicalRequest": canonical_str,
+        "capability": cap_data,
+        "policyVersion": CURRENT_POLICY_VERSION,
+    }

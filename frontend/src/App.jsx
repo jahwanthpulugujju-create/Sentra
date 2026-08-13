@@ -1,144 +1,130 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { COLORS } from "./theme";
-import { getAgents, getTransactions, evaluate, resolve } from "./api";
-import { usePolling } from "./hooks/usePolling";
-import { publishEscalation, subscribeDecisions } from "./ntfy";
-import Header from "./components/Header";
-import AgentRoster from "./components/AgentRoster";
-import RequestPanel from "./components/RequestPanel";
-import ProcessingPanel from "./components/ProcessingPanel";
-import EscalationCard from "./components/EscalationCard";
-import MetricsPanel from "./components/MetricsPanel";
-import NotifyPanel from "./components/NotifyPanel";
-import AuditLog from "./components/AuditLog";
-
-function getTopic() {
-  let t = localStorage.getItem("ntfy_topic");
-  if (!t) {
-    const rand = (
-      window.crypto && crypto.randomUUID
-        ? crypto.randomUUID()
-        : Math.random().toString(36).slice(2)
-    )
-      .replace(/-/g, "")
-      .slice(0, 10);
-    t = `sentra-${rand}`;
-    localStorage.setItem("ntfy_topic", t);
-  }
-  return t;
-}
+import { getHealth, getDashboard, runScenario, verifyProofChain, resetDemo, getReplay } from "./api";
+import HeaderHero from "./components/HeaderHero";
+import ScenarioRunner from "./components/ScenarioRunner";
+import DecisionInspector from "./components/DecisionInspector";
+import ProofChainViewer from "./components/ProofChainViewer";
+import AuthorityPlanes from "./components/AuthorityPlanes";
+import MvpStatusPanel from "./components/MvpStatusPanel";
 
 export default function App() {
-  const agentsPoll = usePolling(getAgents, 2000);
-  const txPoll = usePolling(() => getTransactions(50), 2000);
-  const [proc, setProc] = useState({ running: false, result: null, request: null });
-  const [topic] = useState(getTopic);
-  const [pushEnabled, setPushEnabled] = useState(false);
+  const [health, setHealth] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
+  const [runningScenario, setRunningScenario] = useState(null);
+  const [lastScenarioResult, setLastScenarioResult] = useState(null);
+  const [activeScenarioId, setActiveScenarioId] = useState(null);
+  const [resetting, setResetting] = useState(false);
 
-  const refreshAll = async () => {
-    await Promise.all([agentsPoll.refresh(), txPoll.refresh()]);
-  };
-
-  const runEvaluate = async (body) => {
-    setProc({ running: true, result: null, request: body });
+  const fetchState = useCallback(async () => {
     try {
-      const res = await evaluate(body);
-      setProc({ running: false, result: res, request: body });
-      await refreshAll();
-      if (pushEnabled && res.decision === "escalate" && res.status === "pending") {
-        publishEscalation(topic, {
-          txId: res.transaction_id,
-          agentName: res.agent ? res.agent.name : body.agent_id,
-          amount: body.amount,
-          description: body.description,
-          reason: res.reason,
-        }).catch(() => {});
-      }
+      const [h, d] = await Promise.all([getHealth(), getDashboard()]);
+      setHealth(h);
+      setDashboard(d);
     } catch (e) {
-      setProc({
-        running: false,
-        result: { decision: "error", reason: String(e.message || e) },
-        request: body,
-      });
+      console.error("Failed to fetch state", e);
     }
-  };
+  }, []);
 
-  const onResolved = async () => {
-    setProc((p) => ({ ...p, result: null }));
-    await refreshAll();
-  };
-
-  // Resolve triggered by a phone tap (via ntfy SSE).
-  const resolveFromPhone = async (action, txId) => {
-    try {
-      await resolve({ transaction_id: txId, action });
-      setProc((p) =>
-        p.result && p.result.transaction_id === txId ? { ...p, result: null } : p
-      );
-      await refreshAll();
-    } catch {
-      /* already resolved / stale — ignore */
-    }
-  };
-
-  // Subscribe to phone decisions while push is enabled.
   useEffect(() => {
-    if (!pushEnabled) return undefined;
-    const es = subscribeDecisions(topic, resolveFromPhone);
-    return () => es.close();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pushEnabled, topic]);
+    fetchState();
+    const interval = setInterval(fetchState, 3000);
+    return () => clearInterval(interval);
+  }, [fetchState]);
 
-  const offline = agentsPoll.error && !agentsPoll.data;
-  const pendingEscalation =
-    proc.result &&
-    proc.result.decision === "escalate" &&
-    proc.result.status === "pending";
+  const handleRunScenario = async (scenarioId) => {
+    setRunningScenario(scenarioId);
+    setActiveScenarioId(scenarioId);
+    try {
+      const res = await runScenario(scenarioId);
+      setLastScenarioResult(res);
+      await fetchState();
+    } catch (e) {
+      setLastScenarioResult({
+        verdict: "DENY",
+        reasonCode: "EXECUTION_ERROR",
+        explanation: String(e.message || e),
+        stateChanged: false,
+      });
+    } finally {
+      setRunningScenario(null);
+    }
+  };
+
+  const handleResetBaseline = async () => {
+    setResetting(true);
+    try {
+      await resetDemo();
+      setLastScenarioResult(null);
+      setActiveScenarioId(null);
+      await fetchState();
+    } catch (e) {
+      console.error("Reset failed", e);
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const handleVerifyChain = async () => {
+    try {
+      const verifyRes = await verifyProofChain();
+      setDashboard((prev) =>
+        prev
+          ? {
+              ...prev,
+              proofChainStatus: {
+                valid: verifyRes.valid,
+                errorMessage: verifyRes.errorMessage,
+                totalVerifiedEvents: verifyRes.totalEventsVerified,
+              },
+            }
+          : prev
+      );
+    } catch (e) {
+      console.error("Chain verification failed", e);
+    }
+  };
+
+  const handleReplayEvent = async (eventId) => {
+    try {
+      const rep = await getReplay(eventId);
+      console.log("Replayed event", rep);
+    } catch (e) {
+      console.error("Replay fetch failed", e);
+    }
+  };
+
+  const resourceObj = dashboard?.resources?.find((r) => r.id === "prod_k8s_cluster")?.state;
 
   return (
-    <div style={{ minHeight: "100%", background: COLORS.bg, color: COLORS.ink }}>
-      <div className="max-w-6xl mx-auto px-4 pb-12">
-        <Header onReset={refreshAll} />
+    <div style={{ minHeight: "100vh", background: COLORS.bg, color: COLORS.ink }} className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header & Hero Pipeline Artifact */}
+        <HeaderHero health={health} onReset={handleResetBaseline} resetting={resetting} />
 
-        {offline && (
-          <div
-            className="mb-4 text-sm px-3 py-2 rounded-lg border"
-            style={{ borderColor: COLORS.red, color: COLORS.red }}
-          >
-            Can&apos;t reach the backend at the API base URL. Make sure the
-            backend is running on port 8000 (`/health` shows db_connected: true).
-          </div>
-        )}
+        {/* Live Boundary Test: 6 Mandatory Scenarios */}
+        <ScenarioRunner
+          onRunScenario={handleRunScenario}
+          runningId={runningScenario}
+          activeScenarioId={activeScenarioId}
+        />
 
-        <div className="space-y-4">
-          <AgentRoster agents={agentsPoll.data} />
-          <MetricsPanel />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-4">
-              <RequestPanel
-                agents={agentsPoll.data}
-                onRun={runEvaluate}
-                running={proc.running}
-              />
-              <ProcessingPanel running={proc.running} result={proc.result} />
-              {pendingEscalation && (
-                <EscalationCard
-                  tx={proc.result}
-                  request={proc.request}
-                  onResolved={onResolved}
-                />
-              )}
-            </div>
-            <div className="space-y-4">
-              <AuditLog transactions={txPoll.data} />
-              <NotifyPanel
-                topic={topic}
-                enabled={pushEnabled}
-                onToggle={() => setPushEnabled((v) => !v)}
-              />
-            </div>
-          </div>
-        </div>
+        {/* Decision Inspector */}
+        <DecisionInspector lastResult={lastScenarioResult} resourceState={resourceObj} />
+
+        {/* Proof Chain Timeline & Verifier */}
+        <ProofChainViewer
+          events={dashboard?.recentEvents || []}
+          chainStatus={dashboard?.proofChainStatus}
+          onVerifyChain={handleVerifyChain}
+          onReplayEvent={handleReplayEvent}
+        />
+
+        {/* Four Authority Planes */}
+        <AuthorityPlanes />
+
+        {/* MVP Status & Closing Banner */}
+        <MvpStatusPanel />
       </div>
     </div>
   );
