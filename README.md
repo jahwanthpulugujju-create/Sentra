@@ -22,7 +22,7 @@ Sentra sits between the agent and protected tools as an independent, determinist
    cd frontend
    npm run dev
    ```
-3. **Open Browser**: Open `http://localhost:5173`.
+3. **Open Browser**: Open 
 4. **Run Live Boundary Scenarios**:
    - Click **1. Valid Action** ➔ Verdict `ALLOW` ➔ Gateway executes protected deployment (State Changed 1x).
    - Click **2. Unauthorized Tool** ➔ Verdict `DENY` ➔ Blocked before execution.
