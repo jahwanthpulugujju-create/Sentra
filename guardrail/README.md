@@ -1,14 +1,14 @@
-# GuardRail — Natural-Language, Four-Environment Live Demo
+# GuardRail , Natural-Language, Four-Environment Live Demo
 
 Type a payment request in plain English into an agent and watch a real
-three-check policy engine decide **ALLOW / ESCALATE / DENY** — with real phone
+three-check policy engine decide **ALLOW / ESCALATE / DENY** , with real phone
 push (ntfy.sh) for the human-in-the-loop moment. Self-contained: FastAPI
 backend (in-memory) + a single `index.html` (no framework).
 
 Uses the **canonical agent data and decision logic** from `../Docs/PROJECT_BRIEF.md`.
 
 ## Decision logic (canonical)
-1. Rule engine fails (over budget / blocked vendor / velocity) → **DENY** —
+1. Rule engine fails (over budget / blocked vendor / velocity) → **DENY** ,
    intent + anomaly are skipped (no LLM call, ~ms).
 2. Rule passes → run intent match + anomaly score.
 3. Intent matches **and** not anomalous → **ALLOW**.
@@ -43,22 +43,22 @@ agent's history exceeds 2.
    ```
 
 ## The four environments
-1. **Auto-Approve** — Developer → *"Buy hero image from Unsplash for ₹40"* → **ALLOWED** (~ms).
-2. **Escalate (judgment)** — Research → *"Buy full industry dataset from SimilarWeb for ₹450"* →
+1. **Auto-Approve** , Developer → *"Buy hero image from Unsplash for ₹40"* → **ALLOWED** (~ms).
+2. **Escalate (judgment)** , Research → *"Buy full industry dataset from SimilarWeb for ₹450"* →
    **ESCALATED** (intent OK, but ₹450 is ~29σ above its ₹95 history).
    *(Note: the original ₹2,400 exceeds Research's canonical ₹800 budget, so it would deny on
    the budget rule; ₹450 keeps the canonical budget and escalates via anomaly as intended.)*
-3. **Escalate (hijack)** — Developer → *"Purchase GPU cluster rental for ₹5,000"* →
+3. **Escalate (hijack)** , Developer → *"Purchase GPU cluster rental for ₹5,000"* →
    **ESCALATED** (under the ₹6,000 budget, but off-task and anomalous).
-4. **Auto-Deny** — Developer → *"Buy gaming laptop for ₹85,000"* → **DENIED** (over budget;
+4. **Auto-Deny** , Developer → *"Buy gaming laptop for ₹85,000"* → **DENIED** (over budget;
    intent + anomaly skipped).
 
-Judges can type **anything** into the box — it's parsed and judged live.
+Judges can type **anything** into the box , it's parsed and judged live.
 
-## Phone push (ntfy.sh — no tunnel)
+## Phone push (ntfy.sh , no tunnel)
 Copy the topic in the "Phone push" panel → Subscribe in the ntfy app → Send test →
 run an escalation. The phone's Approve/Deny buttons POST to `<topic>-action`; the
-browser subscribes over SSE and relays the decision to `POST /resolve` — no public
+browser subscribes over SSE and relays the decision to `POST /resolve` , no public
 backend / ngrok needed. (In-dashboard Approve/Deny buttons also appear on escalation.)
 
 ## Endpoints

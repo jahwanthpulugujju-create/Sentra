@@ -1,8 +1,7 @@
-# Sentra — The Authority Boundary for Autonomous Agents
+# Sentra , The Authority Boundary for Autonomous Agents
 
 > **“An agent can propose an action. Sentra decides whether it has authority to execute it.”**
 
----
 
 ## Problem Statement
 
@@ -10,7 +9,6 @@ When an autonomous AI agent is given access to software tools, prompt injections
 
 Sentra sits between the agent and protected tools as an independent, deterministic authority boundary.
 
----
 
 ## 60-Second Demo Path
 
@@ -34,7 +32,6 @@ Sentra sits between the agent and protected tools as an independent, determinist
    - Click **6. Replay Attempt** ➔ Verdict `DENY` ➔ Gateway blocks reused capability.
 5. **Audit Proof Chain**: Click **Audit Proof Chain** to verify SHA-256 event hash integrity.
 
----
 
 ## System Architecture
 
@@ -77,7 +74,6 @@ Sentra sits between the agent and protected tools as an independent, determinist
 └────────────────────────────────────────┘
 ```
 
----
 
 ## Automated Test Command
 
@@ -86,7 +82,6 @@ Run the complete test suite verifying all 11 Playbook enforcement rules:
 backend\.venv\Scripts\python.exe -m pytest backend/test_playbook.py -v
 ```
 
----
 
 ## Repository Structure
 
